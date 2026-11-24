@@ -20,12 +20,11 @@ jobs:
     name: rust (fmt, clippy, test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
         with:
           toolchain: stable
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: fmt
         run: cargo fmt --all -- --check
       - name: clippy
@@ -37,9 +36,8 @@ jobs:
     name: replay gate (matcher accuracy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
       - name: build dataset + traces + score
         run: |
           cargo run -q -p gtfs-builder -- data/tab_seed.json data/gtfs/build
@@ -47,19 +45,18 @@ jobs:
           cargo run -q -p replay -- data/traces tools/replay/thresholds.toml
 
   data:
-    name: gtfs sanity (validator-shaped checks)
+    name: gtfs sanity (structural checks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: build GTFS
         run: cargo run -q -p gtfs-builder -- data/tab_seed.json data/gtfs/build
       - name: structural checks
         run: |
-          python3 - <<'PY'
+          python - <<'PY'
           import csv, pathlib, sys
           root = pathlib.Path('data/gtfs/build')
           dirs = sorted(p for p in root.iterdir() if p.is_dir())
@@ -78,13 +75,15 @@ jobs:
           assert not bad, f'{len(bad)} stop_times lack shape_dist_traveled'
           print(f'data ok: {d.name} stops={len(stops)} trips={len(trips)} stop_times={len(st)}')
           PY
+
   secrets:
     name: secrets scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@cb7149a9754353c08862c22da191602493172a5 # v2
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
