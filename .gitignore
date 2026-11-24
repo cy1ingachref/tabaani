@@ -1,0 +1,20 @@
+# Rust
+target/
+**/target/
+
+# Data: built GTFS and generated traces are derived; the seed is committed.
+data/gtfs/build/
+# Keep one small real trace fixture if you add one; generated ones are ignored.
+data/traces/*.jsonl
+!data/traces/.gitkeep
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Python notebooks
+.ipynb_checkpoints/
+__pycache__/

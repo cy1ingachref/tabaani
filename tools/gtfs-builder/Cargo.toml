@@ -1,0 +1,17 @@
+[package]
+name = "gtfs-builder"
+description = "Build a versioned GTFS dataset from a Tabaani line seed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "gtfs-builder"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+transit-core.workspace = true

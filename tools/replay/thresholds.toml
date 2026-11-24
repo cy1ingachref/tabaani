@@ -1,0 +1,18 @@
+# Replay quality gates (plan §12.2). CI fails if a metric regresses past these.
+# Starting values are deliberately loose; tighten them from measured replay
+# output once real traces exist (do not invent numbers).
+[identification]
+top1_accuracy_min = 0.80
+
+[false_positives]
+max_rate = 0.34
+
+[position]
+median_error_m_max = 60.0
+p95_error_m_max = 200.0
+
+[delay]
+median_error_s_max = 60.0
+
+[ambiguity]
+calibration_ece_max = 0.30

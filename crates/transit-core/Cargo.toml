@@ -1,0 +1,8 @@
+[package]
+name = "transit-core"
+description = "Shared transit geometry and matching maths for Tabaani"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

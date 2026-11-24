@@ -1,0 +1,17 @@
+[package]
+name = "replay"
+description = "Feed recorded traces through the rail matcher and score them"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "replay"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+transit-core.workspace = true

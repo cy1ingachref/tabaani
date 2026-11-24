@@ -1,0 +1,45 @@
+{
+  "dataset": {
+    "version": "0.1.0-dev",
+    "name": "Tabaani pilot seed: TGM Tunis - Marsa",
+    "source": "Geometry derived from the bledi.tn tunismapper-derived station list (license_status unknown-third-party, not redistributed here). Timings are synthetic placeholders for algorithm development and are NOT real schedules.",
+    "note": "Replace `departures` with real operator times before any launch use."
+  },
+  "agency": {
+    "id": "transtu",
+    "name": "Transtu",
+    "timezone": "Africa/Tunis",
+    "lang": "fr"
+  },
+  "route": {
+    "id": "tgm",
+    "short_name": "TGM",
+    "long_name": "Tunis Marine - La Marsa",
+    "mode": "rail",
+    "route_type": 2,
+    "color": "C0392B",
+    "stops": [
+      { "id": "tunis_marine_nord", "name": "TUNIS MARINE NORD", "lat": 36.80069, "lon": 10.19174 },
+      { "id": "le_bac",             "name": "LE BAC",             "lat": 36.81418, "lon": 10.29245 },
+      { "id": "la_goulette",        "name": "LA GOULETTE",        "lat": 36.81805, "lon": 10.30194 },
+      { "id": "goulette_neuve",     "name": "GOULETTE NEUVE",     "lat": 36.81984, "lon": 10.30560 },
+      { "id": "goulette_casino",    "name": "GOULETTE CASINO",    "lat": 36.82420, "lon": 10.30877 },
+      { "id": "khiareddine",        "name": "KHIAREDDINE",        "lat": 36.82878, "lon": 10.31155 },
+      { "id": "a_roport",           "name": "AEROPORT",           "lat": 36.83195, "lon": 10.31387 },
+      { "id": "le_kram",            "name": "LE KRAM",            "lat": 36.83617, "lon": 10.31661 },
+      { "id": "carthage_salambo",   "name": "CARTHAGE SALAMBO",   "lat": 36.84154, "lon": 10.31910 },
+      { "id": "carthage_byrsa",     "name": "CARTHAGE BYRSA",     "lat": 36.84613, "lon": 10.32185 },
+      { "id": "carthage_dermech",   "name": "CARTHAGE DERMECH",   "lat": 36.85012, "lon": 10.32558 },
+      { "id": "carthage_hannibal",  "name": "CARTHAGE HANNIBAL",  "lat": 36.85339, "lon": 10.32892 },
+      { "id": "carthage_pr_sidence","name": "CARTHAGE PRESIDENCE","lat": 36.86165, "lon": 10.33494 },
+      { "id": "carthage_amilcar",   "name": "CARTHAGE AMILCAR",   "lat": 36.86659, "lon": 10.33744 },
+      { "id": "sidi_bousaid",       "name": "SIDI BOUSAID",       "lat": 36.87045, "lon": 10.34213 },
+      { "id": "sidi_dhrif",         "name": "SIDI DHRIF",         "lat": 36.87574, "lon": 10.33967 },
+      { "id": "la_corniche",        "name": "LA CORNICHE",        "lat": 36.88298, "lon": 10.33349 },
+      { "id": "marsa_plage",        "name": "MARSA PLAGE",        "lat": 36.88304, "lon": 10.33345 }
+    ],
+    "departures": ["05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"],
+    "cruise_speed_mps": 12.0,
+    "dwell_s": 20
+  }
+}

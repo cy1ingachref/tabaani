@@ -1,0 +1,90 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
+  cancel-in_progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust (fmt, clippy, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace
+
+  replay:
+    name: replay gate (matcher accuracy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: build dataset + traces + score
+        run: |
+          cargo run -q -p gtfs-builder -- data/tab_seed.json data/gtfs/build
+          cargo run -q -p simulator -- data/gtfs/build/0.1.0-dev data/traces
+          cargo run -q -p replay -- data/traces tools/replay/thresholds.toml
+
+  data:
+    name: gtfs sanity (validator-shaped checks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        with:
+          python-version: '3.12'
+      - name: build GTFS
+        run: cargo run -q -p gtfs-builder -- data/tab_seed.json data/gtfs/build
+      - name: structural checks
+        run: |
+          python3 - <<'PY'
+          import csv, pathlib, sys
+          root = pathlib.Path('data/gtfs/build')
+          dirs = sorted(p for p in root.iterdir() if p.is_dir())
+          assert dirs, 'no dataset version directory produced'
+          d = dirs[-1]
+          required = ['agency.txt','stops.txt','routes.txt','trips.txt','stop_times.txt','shapes.txt','calendar.txt']
+          missing = [f for f in required if not (d / f).exists()]
+          assert not missing, f'missing {missing} in {d}'
+          stops = list(csv.DictReader((d/'stops.txt').open()))
+          trips = list(csv.DictReader((d/'trips.txt').open()))
+          st = list(csv.DictReader((d/'stop_times.txt').open()))
+          assert len(stops) >= 2, 'too few stops'
+          assert trips, 'no trips'
+          assert st, 'no stop times'
+          bad = [r for r in st if not r.get('shape_dist_traveled')]
+          assert not bad, f'{len(bad)} stop_times lack shape_dist_traveled'
+          print(f'data ok: {d.name} stops={len(stops)} trips={len(trips)} stop_times={len(st)}')
+          PY
+  secrets:
+    name: secrets scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@cb7149a9754353c08862c22da191602493172a5 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
