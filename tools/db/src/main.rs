@@ -349,7 +349,7 @@ fn read_csv(path: &Path) -> Result<(Vec<String>, Vec<Vec<String>>)> {
 }
 
 /// Column index for `name`, or `None` if the file does not carry it.
-fn col<'a>(header: &'a [String], name: &str) -> Option<usize> {
+fn col(header: &[String], name: &str) -> Option<usize> {
     header.iter().position(|h| h == name)
 }
 
