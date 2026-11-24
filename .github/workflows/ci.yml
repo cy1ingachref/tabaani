@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
-  cancel-in_progress: true
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -16,6 +16,18 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  lint:
+    name: workflow lint (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: actionlint
+        run: |
+          curl -sL -o /tmp/actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          tar xzf /tmp/actionlint.tar.gz -C /tmp
+          /tmp/actionlint -color .github/workflows/*.yml
+
   rust:
     name: rust (fmt, clippy, test)
     runs-on: ubuntu-latest
