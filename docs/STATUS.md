@@ -140,3 +140,58 @@ transit-core (11), matcher (5), api (5).
 - Confidence is `estimated`; multi-rider fusion (LIVE) arrives with Phase 3.
 - Timings in the seed are still synthetic placeholders.
 - No client yet; no bus matching.
+
+
+---
+
+## Phase 1b — Postgres + PostGIS persistence: DONE
+
+### What was built
+
+- `services/api/migrations/0001_network.sql` — full plan §9 schema: postgis +
+  pg_trgm extensions, `dataset_version`, `stops`/`routes`/`shapes`/`trips`/
+  `stop_times` with GiST spatial indexes and a trigram stop-name index, plus the
+  operational tables (`sessions`, `segment_stats`, `trip_delays`, `labels`).
+- `tools/db` — migrate / load-gtfs / status. Migrations run one per transaction
+  and are recorded in `schema_migrations`; loading is idempotent (clears the
+  previous network then inserts inside one transaction).
+  - Uses `tokio-postgres`, not `sqlx`: this is a one-shot CLI, so no compile-time
+    query macros, and the workspace still builds with no database present.
+  - **Header-aware CSV parsing**: every loader resolves columns by name from the
+    file's own header. Hard-coded indices silently mis-load when GTFS producers
+    reorder columns — which is exactly what happened (see below).
+- `api/src/lib.rs` now probes Postgres for real; `/readyz` no longer reports a
+  fabricated degraded state.
+
+### What was measured (real PostGIS 3.4 on PostgreSQL 16)
+
+```
+dataset_version: 0.1.0-dev
+  stops 18   routes 1   shapes 1   trips 15   stop_times 270   postgis true
+shape length      18576 m   (builder computed 18576 m — exact match)
+termini apart     15598 m straight-line (PostGIS geography)
+GET /readyz       {"status":"ready","checks":{"postgres":{"ok":true},"redis":{"ok":true}}}
+```
+
+### Bugs found by loading into Postgres and fixed
+
+1. **gtfs-builder wrote trips.txt values in the wrong column order** while the
+   header claimed `route_id,service_id,trip_id,...`. Nothing caught it until the
+   FK constraint failed. Fixed at the source (values now match the header).
+2. **Hard-coded CSV column indices in the loader** would have mis-loaded any
+   producer that orders columns differently. Replaced with header-driven access.
+3. **Rust string continuations** (`\` + newline) swallowed SQL spaces, producing
+   `UPDATESET`. Rewritten as a single-space continuation.
+
+### Local port note
+
+This host already has a native Windows `postgres.exe` on 5432, so the project's
+PostGIS container uses **55432**. `DATABASE_URL` defaults to
+`postgres://tabaani:tabaani@127.0.0.1:55432/tabaani`. CI maps 55432 explicitly.
+
+### Honest gaps / next
+
+- The matcher still loads its network from GTFS files at boot, not from Postgres;
+  reading the live network from PostGIS is the next step.
+- Operational tables exist but are not written yet (no ping persistence).
+- Seed timings remain synthetic.

@@ -190,10 +190,39 @@ async fn arrivals_inner(state: &AppState, id: &str) -> anyhow::Result<serde_json
     Ok(json!({ "stop_id": id, "vehicles": out, "basis": "live-redis" }))
 }
 
-async fn ping_postgres(_url: &str) -> anyhow::Result<()> {
-    // Postgres is added in Phase 1b; until then report honestly rather than
-    // pretending a dependency exists.
-    anyhow::bail!("postgres not configured in this phase")
+async fn ping_postgres(url: &str) -> anyhow::Result<()> {
+    // A cheap `SELECT 1` over a short-lived connection: readiness must not
+    // depend on the matcher pool, just on the database answering.
+    let (client, conn) = tokio_postgres::connect(url, tokio_postgres::NoTls)
+        .await
+        .map_err(|e| anyhow::anyhow!("postgres connect failed ({}): {e}", redact_pg(url)))?;
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            tracing::warn!(error = %e, "postgres probe connection error");
+        }
+    });
+    let row = tokio::time::timeout(Duration::from_secs(3), client.query_one("SELECT 1", &[]))
+        .await
+        .map_err(|_| anyhow::anyhow!("postgres probe timed out"))?
+        .map_err(|e| anyhow::anyhow!("postgres probe query failed: {e}"))?;
+    let v: i32 = row.get(0);
+    anyhow::ensure!(v == 1, "unexpected postgres probe result");
+    Ok(())
+}
+
+/// Mask the password in a Postgres URL before logging it.
+fn redact_pg(url: &str) -> String {
+    if let Some(rest) = url
+        .strip_prefix("postgres://")
+        .or_else(|| url.strip_prefix("postgresql://"))
+    {
+        if let Some((userinfo, host)) = rest.split_once('@') {
+            if let Some((user, _pw)) = userinfo.split_once(':') {
+                return format!("postgres://{user}:***@{host}");
+            }
+        }
+    }
+    url.to_string()
 }
 
 async fn ping_redis(url: &str) -> anyhow::Result<()> {

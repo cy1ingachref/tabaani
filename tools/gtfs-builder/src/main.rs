@@ -107,7 +107,7 @@ fn main() -> Result<()> {
     write_stops(&dir, &seed.route.stops)?;
     write_routes(&dir, &seed.route)?;
     let trips = build_trips(&seed.route, &stop_s)?;
-    write_trips(&dir, &trips)?;
+    write_trips(&dir, &trips, &seed.route.id)?;
     write_stop_times(&dir, &trips)?;
     write_shapes(&dir, &seed.route)?;
     write_calendar(&dir)?;
@@ -274,16 +274,18 @@ fn write_routes(dir: &Path, r: &RouteSeed) -> Result<()> {
     )
 }
 
-fn write_trips(dir: &Path, trips: &[Trip]) -> Result<()> {
+fn write_trips(dir: &Path, trips: &[Trip], route_id: &str) -> Result<()> {
+    // Column order must match the declared header exactly:
+    //   route_id, service_id, trip_id, trip_direction_id, shape_id
     let rows: Vec<String> = trips
         .iter()
         .map(|t| {
             row(&[
-                t.id.clone(),
-                "tgm".into(),
+                route_id.to_string(),
                 "wd".into(),
+                t.id.clone(),
                 "0".into(),
-                "tgm".into(),
+                route_id.to_string(),
             ])
         })
         .collect();

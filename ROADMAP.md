@@ -37,6 +37,15 @@ notes: axum api (healthz/readyz/version, WS /v1/ingest, WS /v1/live,
       /v1/stops/{id}/arrivals) + Redis Streams matcher worker. Both binaries
       also verified live against a real redis container.
 
+## GOAL RO-9: Postgres+PostGIS schema migrated and GTFS loaded
+status: done
+phase: 1
+check: cargo run -q -p db -- status
+notes: requires `make pg-up db-load`. Verified: postgis extension present,
+      dataset_version 0.1.0-dev, 18 stops / 1 route / 1 shape / 15 trips /
+      270 stop_times; shape length 18576 m matches the builder's figure and
+      PostGIS measures the termini 15.6 km apart.
+
 ## GOAL RO-5: Whole-system check in one command
 status: planned
 phase: 1

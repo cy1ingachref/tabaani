@@ -1,0 +1,19 @@
+[package]
+name = "db"
+description = "Tabaani Postgres migrations and dataset loading"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "db"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+transit-core.workspace = true
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }

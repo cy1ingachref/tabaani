@@ -12,7 +12,8 @@ async fn main() -> anyhow::Result<()> {
     }
     init_tracing();
 
-    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgres://unused".into());
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://tabaani:tabaani@127.0.0.1:55432/tabaani".into());
     let redis_url = require_env("REDIS_URL")?;
     let bind: SocketAddr = std::env::var("BIND_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
