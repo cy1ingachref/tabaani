@@ -50,6 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
+        with:
+          toolchain: stable
       - name: build dataset + traces + score
         run: |
           cargo run -q -p gtfs-builder -- data/tab_seed.json data/gtfs/build
