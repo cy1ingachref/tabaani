@@ -72,3 +72,71 @@ Last full pipeline run (see `make replay` output):
 The first fit compared observations to `s_sched(t + delta)` instead of
 `s_sched(t - delta)`, which made a real 2 min delay come back as ~11 s. The
 residual sign is now pinned by a unit test over the exact formula in PLAN §7.2.
+
+
+---
+
+## Phase 1 — Ingest + live pipeline: DONE (first slice)
+
+### What was built
+
+- `proto/tabaani/v1/transit.proto` — wire contract: `PingBatch`/`Fix`/`Hint`
+  upstream, `VehicleState`/`LiveFrame`/`Confidence` downstream.
+- `services/api` (axum)
+  - `GET /healthz`, `/readyz` (probes Postgres + Redis; reports **degraded**
+    honestly when a dependency is absent), `/version`.
+  - `WS /v1/ingest` — binary protobuf batches; idempotent per
+    `(session_token, seq_end)` so retries never double-count; 64 KiB batch cap;
+    malformed payloads answered, not crashed on.
+  - `WS /v1/live` — snapshot on connect, then delta frames from `live:all`.
+  - `GET /v1/stops/{id}/arrivals` — vehicles currently known to Redis.
+- `services/matcher` (worker)
+  - Redis Streams consumer group; re-asserts the group at id 0 each tick so a
+    reset stream cannot silently orphan it.
+  - Loads the GTFS network at boot (shape from stop geometry, trip profiles from
+    `shape_dist_traveled`).
+  - Delta-decodes fixes (first fix absolute, later ones deltas), projects onto
+    the route, accumulates per-session observations in Redis, runs
+    `transit-core`'s rail matcher, publishes live state + pub/sub delta.
+- `services/api/src/state.rs` — one shared `StoredVehicle` schema, used by both
+  services so they cannot drift.
+- `tools/e2e` — real WebSocket rider: ingest -> matcher -> live feed, measuring
+  ping->visible latency.
+- `tools/roadmap` + `ROADMAP.md` — goal file; every due goal has a `check:`
+  command. `make roadmap` runs them all and fails if any does not pass.
+
+### How to run it
+
+```bash
+make services-up     # redis container + api + matcher
+make e2e             # live end-to-end gate
+make roadmap         # check every due ROADMAP goal
+```
+
+### What was measured (live, against a real redis container)
+
+| Check | Measured | Target |
+|---|---|---|
+| trip identified | tgm-004 | the simulated rider's trip |
+| fitted delay | 120.0 s | injected exactly 120 s |
+| ping -> visible on /v1/live | ~0.61 s | < 3 s p95 |
+| api /readyz with deps down | 503 degraded | honest degradation |
+
+Replay gate unchanged: top1_accuracy 1.000, false_positive 0.000,
+position_median 1.4 m, delay_median 0.1 s. Tests: 21 passing across
+transit-core (11), matcher (5), api (5).
+
+### Bugs the live gate caught (and fixed)
+
+- XREADGROUP reply shape mis-decoded by redis-rs -> raw `Value` parser.
+- Consumer group anchored at `$`: invisible after a stream reset -> re-assert at 0.
+- Binary protobuf read back as lossy UTF-8 -> refetch raw bytes via XRANGE.
+- Implicit delta origin -> first fix carries absolute coordinates.
+- e2e subscribed only after publishing -> subscribe before sending.
+
+### Honest gaps / next
+
+- Postgres persistence is not wired; `/readyz` reports it degraded by design.
+- Confidence is `estimated`; multi-rider fusion (LIVE) arrives with Phase 3.
+- Timings in the seed are still synthetic placeholders.
+- No client yet; no bus matching.
