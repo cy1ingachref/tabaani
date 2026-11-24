@@ -47,3 +47,33 @@ lint: ## Formatting + clippy only
 clean: ## Remove build outputs (target dir, generated data)
 	cargo clean
 	rm -rf data/gtfs/build data/traces/*.jsonl
+
+# --- services / live pipeline (Phase 1) -------------------------------------
+
+REDIS_URL ?= redis://127.0.0.1:6379
+API_WS    ?= ws://127.0.0.1:8080
+GTFS      := $(GTFS_DIR)
+
+.PHONY: services-up
+services-up: data ## Start api + matcher against a local redis (docker)
+	docker rm -f tabaani-redis >/dev/null 2>&1 || true
+	docker run -d --name tabaani-redis -p 6379:6379 redis:7-alpine >/dev/null
+	@sleep 4
+	REDIS_URL=$(REDIS_URL) ./target/debug/api > /tmp/tabaani-api.log 2>&1 &
+	@sleep 2
+	REDIS_URL=$(REDIS_URL) GTFS_DIR=$(GTFS) ./target/debug/matcher > /tmp/tabaani-matcher.log 2>&1 &
+	@sleep 2
+	@echo "api + matcher started (logs: /tmp/tabaani-{api,matcher}.log)"
+
+.PHONY: services-down
+services-down: ## Stop api + matcher
+	@-taskkill /F /IM api.exe >/dev/null 2>&1 || true
+	@-taskkill /F /IM matcher.exe >/dev/null 2>&1 || true
+
+.PHONY: e2e
+e2e: traces ## Live end-to-end check: ingest -> matcher -> /v1/live
+	cargo run -q -p e2e
+
+.PHONY: roadmap
+roadmap: ## Verify every due ROADMAP.md goal
+	cargo run -q -p roadmap

@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package tabaani.v1;
+
+// PingBatch carries a delta-encoded burst of fixes from one session token.
+// The token is random per trip and rotates; it is never a persistent device id
+// (plan §11.1).
+message PingBatch {
+  string session_token = 1;
+  uint32 seq_start = 2;        // ordering for late/out-of-order batches
+  string dataset_version = 3;
+  repeated Fix fixes = 4;
+  optional Hint hint = 5;      // user-confirmed route/direction, if any
+}
+
+// Fix is one position fix. Coordinates are delta-encoded against the previous
+// fix in the same batch to keep the payload small on mobile data.
+message Fix {
+  sint32 d_lat_e7 = 1;         // delta latitude, 1e-7 degrees
+  sint32 d_lon_e7 = 2;
+  uint32 d_ts_ms = 3;          // delta timestamp, milliseconds
+  uint32 accuracy_dm = 4;      // horizontal accuracy, decimetres
+  uint32 speed_cms = 5;        // speed, centimetres/second
+  uint32 bearing_deg = 6;      // heading, degrees
+}
+
+message Hint {
+  string route_id = 1;
+  uint32 direction = 2;
+}
+
+// A delta message on the live feed: only vehicles that changed since the
+// client's last update (plan §8.2). Absent fields mean "unchanged".
+message VehicleState {
+  string vehicle_id = 1;
+  string route_id = 2;
+  uint32 direction = 3;
+  float s_m = 4;               // distance along the route shape
+  float v_mps = 5;
+  uint64 ts_ms = 6;
+  Confidence confidence = 7;
+  uint32 n_riders = 8;
+  string trip_id = 9;          // empty when unidentified
+  float delay_s = 10;          // fitted delay once identified
+  string vehicle_type = 11;    // bus_12m, tram, train_coach...
+  uint32 n_cars = 12;          // 0 = unknown
+}
+
+enum Confidence {
+  CONFIDENCE_UNKNOWN = 0;
+  SCHEDULED = 1;               // timetable ghost, no rider evidence
+  ESTIMATED = 2;               // dead-reckoned or weak evidence
+  LIVE = 3;                   // consensus-backed live position
+}
+
+// One client frame of the live feed.
+message LiveFrame {
+  repeated VehicleState vehicles = 1;
+}

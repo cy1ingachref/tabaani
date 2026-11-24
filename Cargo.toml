@@ -5,6 +5,10 @@ members = [
     "tools/gtfs-builder",
     "tools/replay",
     "tools/simulator",
+    "tools/roadmap",
+    "tools/e2e",
+    "services/api",
+    "services/matcher",
 ]
 
 [workspace.package]

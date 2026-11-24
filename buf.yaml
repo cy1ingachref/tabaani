@@ -1,0 +1,10 @@
+# buf lint/breaking config for Tabaani protobuf contracts.
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

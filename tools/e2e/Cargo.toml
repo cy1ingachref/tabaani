@@ -1,0 +1,21 @@
+[package]
+name = "e2e"
+description = "Live end-to-end check: ws ingest -> matcher -> live feed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "e2e"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+api = { path = "../../services/api" }
+transit-core.workspace = true
+tokio = { version = "1", features = ["full"] }
+redis = { version = "0.32", features = ["tokio-comp", "connection-manager"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+url = "2"
