@@ -104,7 +104,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U tabaani" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
-      DATABASE_URL: postgres://tabaani:***@127.0.0.1:55432/tabaani
+      DATABASE_URL: postgres://tabaani:tabaani@127.0.0.1:55432/tabaani
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
@@ -114,7 +114,7 @@ jobs:
         run: |
           for i in $(seq 1 60); do
             if PGPASSWORD=tabaani psql -h 127.0.0.1 -p 55432 -U tabaani -d tabaani -tAc "SELECT 1" >/dev/null 2>&1; then
-              echo "postgres queryable"; exit 0
+              echo "postgres queryable after ${i}s"; exit 0
             fi
             sleep 2
           done
@@ -191,7 +191,7 @@ jobs:
         run: |
           for i in $(seq 1 60); do
             if PGPASSWORD=tabaani psql -h 127.0.0.1 -p 55432 -U tabaani -d tabaani -tAc "SELECT 1" >/dev/null 2>&1; then
-              echo "postgres queryable"; break
+              echo "postgres queryable after ${i}s"; break
             fi
             sleep 2
           done

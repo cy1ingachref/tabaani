@@ -93,7 +93,7 @@ roadmap: ## Verify every due ROADMAP.md goal (each check is self-contained)
 
 # --- Postgres / PostGIS (data layer) ----------------------------------------
 
-POSTGRES_URL ?= postgres://tabaani:***@127.0.0.1:55432/tabaani
+POSTGRES_URL ?= postgres://tabaani:tabaani@127.0.0.1:55432/tabaani
 export DATABASE_URL ?= $(POSTGRES_URL)
 
 .PHONY: pg-up

@@ -20,7 +20,7 @@ struct Cfg {
 async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://tabaani:***@127.0.0.1:5432/tabaani".into());
+        .unwrap_or_else(|_| "postgres://tabaani:tabaani@127.0.0.1:55432/tabaani".into());
     let cfg = Cfg { url };
     match args.get(1).map(String::as_str) {
         Some("migrate") => migrate(&cfg).await,
