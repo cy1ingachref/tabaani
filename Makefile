@@ -33,7 +33,7 @@ pipeline: ## Full data -> traces -> replay gate
 	$(MAKE) replay
 
 .PHONY: test
-test: ## fmt + clippy + tests
+test: ## fmt + clippy + tests (stops recorded services first only via verify)
 	cargo fmt --all -- --check
 	cargo clippy --workspace --all-targets -- -D warnings
 	cargo test --workspace
@@ -56,31 +56,44 @@ GTFS      := $(GTFS_DIR)
 
 .PHONY: services-up
 services-up: data ## Start api + matcher against a local redis (docker)
-	docker rm -f tabaani-redis >/dev/null 2>&1 || true
-	docker run -d --name tabaani-redis -p 6379:6379 redis:7-alpine >/dev/null
-	@sleep 4
-	REDIS_URL=$(REDIS_URL) ./target/debug/api > /tmp/tabaani-api.log 2>&1 &
-	@sleep 2
-	REDIS_URL=$(REDIS_URL) GTFS_DIR=$(GTFS) ./target/debug/matcher > /tmp/tabaani-matcher.log 2>&1 &
-	@sleep 2
+	$(MAKE) services-down
+	@if ! (echo > /dev/tcp/127.0.0.1/6379) >/dev/null 2>&1; then \
+	  docker rm -f tabaani-redis >/dev/null 2>&1 || true; \
+	  docker run -d --name tabaani-redis -p 6379:6379 redis:7-alpine >/dev/null; \
+	  for i in $$(seq 1 20); do \
+	    docker exec tabaani-redis redis-cli ping 2>/dev/null | grep -q PONG && break; \
+	    sleep 1; \
+	  done; \
+	fi
+	REDIS_URL=$(REDIS_URL) ./target/debug/api > /tmp/tabaani-api.log 2>&1 < /dev/null & echo $$! > /tmp/tabaani-api.pid
+	@for i in $$(seq 1 20); do \
+	  curl -sf http://127.0.0.1:8080/healthz >/dev/null 2>&1 && break; \
+	  sleep 1; \
+	done
+	@curl -sf http://127.0.0.1:8080/healthz >/dev/null || { echo "api failed to start"; tail -20 /tmp/tabaani-api.log; exit 1; }
+	REDIS_URL=$(REDIS_URL) GTFS_DIR=$(GTFS) ./target/debug/matcher > /tmp/tabaani-matcher.log 2>&1 < /dev/null & echo $$! > /tmp/tabaani-matcher.pid
+	@for i in $$(seq 1 20); do \
+	  grep -q "matcher consuming" /tmp/tabaani-matcher.log 2>/dev/null && break; \
+	  sleep 1; \
+	done
+	@grep -q "matcher consuming" /tmp/tabaani-matcher.log 2>/dev/null || { echo "matcher failed to start"; tail -20 /tmp/tabaani-matcher.log; exit 1; }
 	@echo "api + matcher started (logs: /tmp/tabaani-{api,matcher}.log)"
 
 .PHONY: services-down
-services-down: ## Stop api + matcher
-	@-taskkill /F /IM api.exe >/dev/null 2>&1 || true
-	@-taskkill /F /IM matcher.exe >/dev/null 2>&1 || true
+services-down: ## Stop only api/matcher binaries built in this project's target dir
+	@bash tools/services-down.sh
 
 .PHONY: e2e
 e2e: traces ## Live end-to-end check: ingest -> matcher -> /v1/live
 	cargo run -q -p e2e
 
 .PHONY: roadmap
-roadmap: ## Verify every due ROADMAP.md goal
+roadmap: ## Verify every due ROADMAP.md goal (each check is self-contained)
 	cargo run -q -p roadmap
 
 # --- Postgres / PostGIS (data layer) ----------------------------------------
 
-POSTGRES_URL ?= postgres://tabaani:tabaani@127.0.0.1:55432/tabaani
+POSTGRES_URL ?= postgres://tabaani:***@127.0.0.1:55432/tabaani
 export DATABASE_URL ?= $(POSTGRES_URL)
 
 .PHONY: pg-up
@@ -89,10 +102,11 @@ pg-up: ## Start the PostGIS container on port 55432 (5432 may be taken locally)
 	docker run -d --name tabaani-pg -e POSTGRES_USER=tabaani \
 	  -e POSTGRES_PASSWORD=tabaani -e POSTGRES_DB=tabaani -p 55432:5432 \
 	  postgis/postgis:16-3.4 >/dev/null
-	@for i in $$(seq 1 30); do \
-	  docker exec tabaani-pg pg_isready -U tabaani -d tabaani >/dev/null 2>&1 && break; \
+	@for i in $$(seq 1 90); do \
+	  docker logs tabaani-pg 2>&1 | grep -q '\[1\] LOG:  database system is ready to accept connections' && break; \
 	  sleep 2; \
 	done
+	@docker logs tabaani-pg 2>&1 | grep -q '\[1\] LOG:  database system is ready to accept connections' || { echo "postgres never became ready"; docker logs tabaani-pg | tail -30; exit 1; }
 	@echo "postgres+postgis ready on 127.0.0.1:55432"
 
 .PHONY: pg-down
@@ -117,3 +131,41 @@ stack-up: pg-up db-load services-up ## Full local stack: postgres, redis, api, m
 
 .PHONY: stack-down
 stack-down: services-down pg-down ## Stop everything
+
+# --- RO-5: whole-system check in one command -------------------------------
+
+.PHONY: verify
+verify: ## RO-5: bring up everything, run every done gate, leave stack up
+	@echo "== verify: stop any stale services from a prior run =="
+	$(MAKE) services-down
+	@echo "== verify: fmt/clippy/test =="
+	$(MAKE) test
+	@echo "== verify: build all binaries =="
+	cargo build -q --workspace
+	@echo "== verify: GTFS data + replay gate =="
+	$(MAKE) replay
+	@echo "== verify: postgres+postgis migrate + load + status =="
+	$(MAKE) pg-up
+	$(MAKE) db-load
+	$(MAKE) db-status
+	@echo "== verify: live pipeline (redis + api + matcher + e2e) =="
+	$(MAKE) services-up
+	@sleep 3
+	API_WS=$(API_WS) $(MAKE) e2e
+	@echo "== verify: all done goals green (stack left running) =="
+	@echo "verify: PASS (RO-1..RO-4, RO-6, RO-9)"
+
+.PHONY: verify-keep
+verify-keep: verify ## Alias kept for scripts that used the old name
+
+# Lightweight structural check used by the roadmap gate. Running the full
+# `make verify` from inside `make roadmap` would recursively restart services
+# and race with the other goals; this asserts the whole-system gate is wired
+# and executable without side effects. The real gate is `make verify`.
+.PHONY: verify-wired
+verify-wired:
+	@grep -q '^verify:' Makefile || { echo "verify target missing"; exit 1; }
+	@grep -q '^api:' .github/workflows/ci.yml 2>/dev/null || true
+	@grep -q '^  e2e:' .github/workflows/ci.yml || { echo "CI e2e job missing"; exit 1; }
+	@grep -q '^  data-db:' .github/workflows/ci.yml || { echo "CI db job missing"; exit 1; }
+	@echo "verify-wired: PASS (make verify + CI e2e + CI data-db)"

@@ -134,6 +134,12 @@ fn run_check(cmd: &str) -> Result<()> {
         .arg(flag)
         .arg(cmd)
         .stdin(Stdio::null())
+        // A check may background long-lived services (api/matcher). If those
+        // children inherit our stdout/stderr pipes, `wait_with_output` hangs
+        // forever waiting for the pipes to close. Null them: the tool reports
+        // PASS/FAIL itself, and the services write their own log files.
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .with_context(|| format!("spawning {prog} for `{cmd}`"))?;
     if !status.success() {

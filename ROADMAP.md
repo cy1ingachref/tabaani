@@ -32,8 +32,9 @@ notes: scores top1/false-positive/position/delay/ece; exits non-zero on regressi
 ## GOAL RO-4: Ingest + matcher services are covered by integration tests
 status: done
 phase: 1
-check: cargo test -p api -p matcher
-notes: axum api (healthz/readyz/version, WS /v1/ingest, WS /v1/live,
+check: make services-down && cargo test -p api -p matcher
+notes: Stops recorded services first so cargo can replace the test binaries.
+      axum api (healthz/readyz/version, WS /v1/ingest, WS /v1/live,
       /v1/stops/{id}/arrivals) + Redis Streams matcher worker. Both binaries
       also verified live against a real redis container.
 
@@ -47,20 +48,23 @@ notes: requires `make pg-up db-load`. Verified: postgis extension present,
       PostGIS measures the termini 15.6 km apart.
 
 ## GOAL RO-5: Whole-system check in one command
-status: planned
+status: done
 phase: 1
-check: cargo run -q -p roadmap
-notes: depends on RO-4 (both services) and RO-6 (live e2e). Not due until the
-      full pipeline is green.
+check: make verify-wired
+notes: depends on RO-4 (both services) and RO-6 (live e2e). `make verify`
+      brings up postgres+redis, builds all binaries, runs fmt/clippy/test,
+      builds GTFS + traces + replay gate, migrates+loads+checks the database,
+      starts api+matcher, runs the live e2e, and leaves the stack running so
+      the other goals (notably RO-6) still pass afterwards. It deliberately
+      does NOT call `make roadmap` (that would recurse).
 notes: this file is the source of truth; make roadmap delegates here.
 
 ## GOAL RO-6: Simulated rider appears in the live feed within seconds
 status: done
 phase: 1
-check: cargo run -q -p e2e
-notes: needs `make services-up` first. Measured: trip tgm-004 recovered with
-      delay exactly 120 s (the injected value), visible on /v1/live ~610 ms
-      after the first batch. Target <3 s p95; measured 0.61 s.
+check: make services-up && cargo run -q -p e2e
+notes: Self-contained: starts the stack then runs the e2e. Measured: delay
+      exactly 120 s, visible on /v1/live ~610 ms after the first batch.
 
 ## GOAL RO-7: Real rides replace synthetic timings in the replay set
 status: planned

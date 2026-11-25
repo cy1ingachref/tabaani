@@ -51,21 +51,41 @@ fn redact(url: &str) -> String {
     }
     url.to_string()
 }
-
 async fn connect(cfg: &Cfg) -> Result<Client> {
-    let (client, connection) = tokio_postgres::connect(&cfg.url, tokio_postgres::NoTls)
-        .await
-        .with_context(|| format!("connecting to {}", redact(&cfg.url)))?;
-    // The driver requires a live task to service the socket.
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("db: postgres connection error: {e}");
+    // Startup races happen when the container has accepted a local connection
+    // but is not yet ready for TCP clients. Retry briefly rather than making
+    // the caller sequence sleeps perfectly.
+    let mut last = None;
+    for attempt in 1..=10 {
+        let result = async {
+            let (client, connection) =
+                tokio_postgres::connect(&cfg.url, tokio_postgres::NoTls).await?;
+            tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("db: postgres connection error: {e}");
+                }
+            });
+            client
+                .batch_execute("SET application_name = 'tabaani-db'")
+                .await?;
+            Ok::<Client, tokio_postgres::Error>(client)
         }
-    });
-    client
-        .batch_execute("SET application_name = 'tabaani-db'")
-        .await?;
-    Ok(client)
+        .await;
+        match result {
+            Ok(client) => return Ok(client),
+            Err(e) => {
+                last = Some(e);
+                if attempt < 10 {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
+            }
+        }
+    }
+    Err(anyhow::anyhow!(
+        "connecting to {} after 10 attempts: {}",
+        redact(&cfg.url),
+        last.map(|e| e.to_string()).unwrap_or_default()
+    ))
 }
 
 async fn migrate(cfg: &Cfg) -> Result<()> {

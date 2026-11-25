@@ -104,7 +104,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U tabaani" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
-      DATABASE_URL: postgres://tabaani:tabaani@127.0.0.1:55432/tabaani
+      DATABASE_URL: postgres://tabaani:***@127.0.0.1:55432/tabaani
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
@@ -148,6 +148,43 @@ jobs:
           curl -sf http://127.0.0.1:8080/healthz
       - name: run e2e
         run: cargo run -q -p e2e
+
+  whole-system:
+    name: whole-system verify (RO-5)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: tabaani
+          POSTGRES_PASSWORD: tabaani
+          POSTGRES_DB: tabaani
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tabaani" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+      DATABASE_URL: postgres://tabaani:tabaani@127.0.0.1:55432/tabaani
+      API_WS: ws://127.0.0.1:8080
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
+        with:
+          toolchain: stable
+      - name: install node (roadmap gate wiring check)
+        run: sudo apt-get update && sudo apt-get install -y nodejs
+      - name: full verify + roadmap gate
+        run: |
+          make verify-wired
+          make data
+          make db-load
+          cargo build -q --workspace
+          make roadmap
 
   secrets:
     name: secrets scan

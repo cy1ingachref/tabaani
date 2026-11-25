@@ -187,7 +187,7 @@ GET /readyz       {"status":"ready","checks":{"postgres":{"ok":true},"redis":{"o
 
 This host already has a native Windows `postgres.exe` on 5432, so the project's
 PostGIS container uses **55432**. `DATABASE_URL` defaults to
-`postgres://tabaani:tabaani@127.0.0.1:55432/tabaani`. CI maps 55432 explicitly.
+`postgres://tabaani:***@127.0.0.1:55432/tabaani`. CI maps 55432 explicitly.
 
 ### Honest gaps / next
 
@@ -195,3 +195,37 @@ PostGIS container uses **55432**. `DATABASE_URL` defaults to
   reading the live network from PostGIS is the next step.
 - Operational tables exist but are not written yet (no ping persistence).
 - Seed timings remain synthetic.
+
+
+---
+
+## RO-5 — Whole-system check in one command: DONE
+
+`make verify` from a clean checkout now brings up PostGIS + Redis, builds and
+tests everything, runs the replay gate, migrates + loads + checks the database,
+starts api + matcher, runs the live e2e, and leaves the stack up for inspection.
+`make roadmap` runs all goal checks and now passes 9/9 (7 done, 2 planned-skip).
+
+### Bugs found while making this a single command and fixed
+
+1. **roadmap tool hung on backgrounded services** — child processes inherited
+   the tool's stdout/stderr pipes; `cmd /C` waited forever for them to close.
+   The tool now spawns checks with null stdio (it reports PASS/FAIL itself).
+2. **stale api/matcher binaries blocked `cargo test`** — `make services-down`
+   now stops only processes whose executable lives in this repo's
+   `target/debug`, via a generated PowerShell helper (no sweep-kill).
+3. **Windows `$!` gave MSYS shell PIDs, not Windows PIDs** — replaced with
+   path-scoped process matching.
+4. **Postgres readiness matched the bootstrap server's log line** — now waits
+   for the final `[1] LOG: database system is ready...` line, and `db` retries
+   its full handshake (connect + SET) 10 times.
+5. **services-up hard-coded a Redis container** — now reuses an already
+   reachable Redis (as on CI), so it works both locally and on GitHub runners.
+
+### Measured
+
+  make verify        PASS (e2e delay=120 s, visible in ~615 ms)
+  make roadmap       9 goals: all due goals pass
+  cargo test          21 passed / 0 failed
+  fmt / clippy        clean
+  actionlint          clean
