@@ -8,6 +8,7 @@ members = [
     "tools/roadmap",
     "tools/e2e",
     "tools/db",
+    "tools/dump-trace",
     "services/api",
     "services/matcher",
 ]
