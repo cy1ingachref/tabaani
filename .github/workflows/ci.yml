@@ -110,6 +110,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # HEAD (2026-11)
         with:
           toolchain: stable
+      - name: await postgis
+        run: |
+          for i in $(seq 1 60); do
+            if PGPASSWORD=tabaani psql -h 127.0.0.1 -p 55432 -U tabaani -d tabaani -tAc "SELECT 1" >/dev/null 2>&1; then
+              echo "postgres queryable"; exit 0
+            fi
+            sleep 2
+          done
+          echo "postgres never became queryable"; exit 1
       - name: build dataset, migrate, load, verify
         run: |
           cargo run -q -p gtfs-builder -- data/tab_seed.json data/gtfs/build
@@ -178,10 +187,19 @@ jobs:
           toolchain: stable
       - name: install node (roadmap gate wiring check)
         run: sudo apt-get update && sudo apt-get install -y nodejs
+      - name: await services
+        run: |
+          for i in $(seq 1 60); do
+            if PGPASSWORD=tabaani psql -h 127.0.0.1 -p 55432 -U tabaani -d tabaani -tAc "SELECT 1" >/dev/null 2>&1; then
+              echo "postgres queryable"; break
+            fi
+            sleep 2
+          done
+          PGPASSWORD=tabaani psql -h 127.0.0.1 -p 55432 -U tabaani -d tabaani -tAc "SELECT 1" >/dev/null
       - name: full verify + roadmap gate
         run: |
           make verify-wired
-          make data
+          make traces
           make db-load
           cargo build -q --workspace
           make roadmap

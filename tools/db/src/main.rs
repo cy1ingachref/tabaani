@@ -84,7 +84,7 @@ async fn connect(cfg: &Cfg) -> Result<Client> {
     Err(anyhow::anyhow!(
         "connecting to {} after 10 attempts: {}",
         redact(&cfg.url),
-        last.map(|e| e.to_string()).unwrap_or_default()
+        last.map(|e| format!("{e:?}")).unwrap_or_default()
     ))
 }
 
